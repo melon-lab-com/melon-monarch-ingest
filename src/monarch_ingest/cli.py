@@ -11,6 +11,8 @@ contract (0=ok, 2=schema mismatch, 3=unmatched, 4=missing file).
 
 from __future__ import annotations
 
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated, Protocol
 
@@ -77,6 +79,22 @@ def _check_file_exists(path: Path) -> None:
     if not path.exists():
         typer.echo(f"Error: CSV not found: {path}", err=True)
         raise typer.Exit(code=EXIT_MISSING_FILE)
+
+
+@contextmanager
+def _db_session(db_url: str | None) -> Generator[Session, None, None]:
+    """Migrate to head, open a session, dispose the engine on exit.
+
+    Centralises the upgrade_head → make_engine → session_scope →
+    engine.dispose() sequence that every rules subcommand needs.
+    """
+    upgrade_head(db_url)
+    engine = make_engine(db_url)
+    try:
+        with session_scope(engine) as session:
+            yield session
+    finally:
+        engine.dispose()
 
 
 def _run_import(
@@ -182,29 +200,24 @@ app.add_typer(rules_app, name="rules")
 @rules_app.command("list")
 def rules_list(db_url: DbUrlOpt = None) -> None:
     """Print active and inactive rules in priority order."""
-    upgrade_head(db_url)
-    engine = make_engine(db_url)
-    try:
-        with session_scope(engine) as session:
-            all_rules = (
-                session.execute(
-                    select(Rule).order_by(Rule.kind.asc(), Rule.priority.asc(), Rule.id.asc())
-                )
-                .scalars()
-                .all()
+    with _db_session(db_url) as session:
+        all_rules = (
+            session.execute(
+                select(Rule).order_by(Rule.kind.asc(), Rule.priority.asc(), Rule.id.asc())
             )
-        if not all_rules:
-            typer.echo("No rules defined.")
-            return
-        typer.echo(f"\n{len(all_rules)} rule(s):")
-        for r in all_rules:
-            flag = "on " if r.active else "off"
-            typer.echo(
-                f"  #{r.id} {flag} {r.kind:<9} p={r.priority:>4} "
-                f"target={r.target_id:>4}  /{r.pattern}/"
-            )
-    finally:
-        engine.dispose()
+            .scalars()
+            .all()
+        )
+    if not all_rules:
+        typer.echo("No rules defined.")
+        return
+    typer.echo(f"\n{len(all_rules)} rule(s):")
+    for r in all_rules:
+        flag = "on " if r.active else "off"
+        typer.echo(
+            f"  #{r.id} {flag} {r.kind:<9} p={r.priority:>4} "
+            f"target={r.target_id:>4}  /{r.pattern}/"
+        )
 
 
 @rules_app.command("add")
@@ -229,21 +242,16 @@ def rules_add(
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from None
 
-    upgrade_head(db_url)
-    engine = make_engine(db_url)
-    try:
-        with session_scope(engine) as session:
-            target_model = Merchant if kind == KIND_MERCHANT else Category
-            target = session.get(target_model, target_id)
-            if target is None:
-                typer.echo(f"Error: {kind} id {target_id} does not exist.", err=True)
-                raise typer.Exit(code=1)
-            rule = Rule(kind=kind, pattern=pattern, target_id=target_id, priority=priority)
-            session.add(rule)
-            session.flush()
-            typer.echo(f"Added rule #{rule.id} ({kind} → {target_id}, priority {priority}).")
-    finally:
-        engine.dispose()
+    with _db_session(db_url) as session:
+        target_model = Merchant if kind == KIND_MERCHANT else Category
+        target = session.get(target_model, target_id)
+        if target is None:
+            typer.echo(f"Error: {kind} id {target_id} does not exist.", err=True)
+            raise typer.Exit(code=1)
+        rule = Rule(kind=kind, pattern=pattern, target_id=target_id, priority=priority)
+        session.add(rule)
+        session.flush()
+        typer.echo(f"Added rule #{rule.id} ({kind} → {target_id}, priority {priority}).")
 
 
 @rules_app.command("remove")
@@ -252,18 +260,13 @@ def rules_remove(
     db_url: DbUrlOpt = None,
 ) -> None:
     """Delete a rule by id."""
-    upgrade_head(db_url)
-    engine = make_engine(db_url)
-    try:
-        with session_scope(engine) as session:
-            rule = session.get(Rule, rule_id)
-            if rule is None:
-                typer.echo(f"Error: rule #{rule_id} not found.", err=True)
-                raise typer.Exit(code=1)
-            session.delete(rule)
-            typer.echo(f"Removed rule #{rule_id}.")
-    finally:
-        engine.dispose()
+    with _db_session(db_url) as session:
+        rule = session.get(Rule, rule_id)
+        if rule is None:
+            typer.echo(f"Error: rule #{rule_id} not found.", err=True)
+            raise typer.Exit(code=1)
+        session.delete(rule)
+        typer.echo(f"Removed rule #{rule_id}.")
 
 
 @rules_app.command("apply")
@@ -274,14 +277,9 @@ def rules_apply(db_url: DbUrlOpt = None) -> None:
     under one commit, so a partial replay can't leave the DB in a
     mixed state.
     """
-    upgrade_head(db_url)
-    engine = make_engine(db_url)
-    try:
-        with session_scope(engine) as session:
-            count = apply_all(session)
-        typer.echo(f"Applied rules: {count} transaction field(s) rewritten.")
-    finally:
-        engine.dispose()
+    with _db_session(db_url) as session:
+        count = apply_all(session)
+    typer.echo(f"Applied rules: {count} transaction field(s) rewritten.")
 
 
 def main() -> None:
