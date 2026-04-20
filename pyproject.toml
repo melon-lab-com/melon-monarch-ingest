@@ -1,0 +1,112 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "melon-monarch-ingest"
+version = "0.1.0"
+description = "Monarch Money CSV ingest library: parsers, dedup hashing, SQLAlchemy models, Alembic migrations, CLI."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { file = "LICENSE" }
+authors = [{ name = "melon-lab-com" }]
+keywords = ["monarch", "monarch-money", "personal-finance", "csv", "etl", "sqlalchemy"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "sqlalchemy>=2.0.36",
+    "alembic>=1.13",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "typer>=0.13,<0.30",
+]
+
+[project.urls]
+Homepage = "https://github.com/melon-lab-com/melon-monarch-ingest"
+Repository = "https://github.com/melon-lab-com/melon-monarch-ingest"
+Issues = "https://github.com/melon-lab-com/melon-monarch-ingest/issues"
+Changelog = "https://github.com/melon-lab-com/melon-monarch-ingest/blob/main/CHANGELOG.md"
+
+[project.scripts]
+monarch-ingest = "monarch_ingest.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "hypothesis>=6.100",
+    "ruff~=0.15.11",
+    "mypy~=1.20.1",
+    "pre-commit>=3.8",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/monarch_ingest"]
+
+# ---- ruff ----
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",
+    "I",
+    "B",
+    "UP",
+    "SIM",
+    "RUF",
+]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# ---- mypy ----
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+mypy_path = ["src"]
+pretty = true
+show_error_codes = true
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_decorators = false
+
+# ---- pytest ----
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-fail-under=85",
+]
+
+# ---- coverage ----
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
