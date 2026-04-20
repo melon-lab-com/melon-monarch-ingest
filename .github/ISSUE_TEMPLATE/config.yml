@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: AGENTS.md — conventions for agent-driven work
+    url: https://github.com/melon-lab-com/melon-monarch-ingest/blob/main/AGENTS.md
+    about: Read this first if you're onboarding an agent or a human to this repo.
+  - name: Architecture Decision Records
+    url: https://github.com/melon-lab-com/melon-monarch-ingest/tree/main/docs/decisions
+    about: Locked choices (CSV hashing, sync SQLAlchemy, Typer CLI, account identity). File a decision issue if a new one is needed.
+  - name: Data model reference
+    url: https://github.com/melon-lab-com/melon-monarch-ingest/blob/main/docs/data-model.md
+    about: Per-table schema + rationale. Must stay in lockstep with ORM (enforced by test_data_model_is_current.py).
+  - name: Downstream consumer — melon-monarch-cfo
+    url: https://github.com/melon-lab-com/melon-monarch-cfo
+    about: Private CFO app that pins this library by commit SHA. Breaking changes need a coordinated bump there.
