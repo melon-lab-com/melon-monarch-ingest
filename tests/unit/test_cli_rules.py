@@ -8,9 +8,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from sqlalchemy import select
 from typer.testing import CliRunner
 
 from monarch_ingest.cli import app
+from monarch_ingest.db import make_engine, session_scope
+from monarch_ingest.models import Merchant, Transaction
 
 runner = CliRunner()
 
@@ -70,11 +73,6 @@ class TestRulesAdd:
     def test_add_then_list_shows_the_rule(self, tmp_path: Path) -> None:
         db_url = _seed(tmp_path)
         # Get a valid merchant id from the seeded data.
-        from sqlalchemy import select
-
-        from monarch_ingest.db import make_engine, session_scope
-        from monarch_ingest.models import Merchant
-
         engine = make_engine(db_url)
         with session_scope(engine) as session:
             mid = session.scalars(select(Merchant.id).limit(1)).one()
@@ -115,11 +113,6 @@ class TestRulesApply:
         # points them at an existing merchant. After `rules apply`,
         # every txn should now carry that merchant_id.
         db_url = _seed(tmp_path)
-        from sqlalchemy import select
-
-        from monarch_ingest.db import make_engine, session_scope
-        from monarch_ingest.models import Merchant, Transaction
-
         engine = make_engine(db_url)
         with session_scope(engine) as session:
             mid = session.scalars(select(Merchant.id).limit(1)).one()
