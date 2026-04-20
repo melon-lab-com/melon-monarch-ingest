@@ -54,6 +54,7 @@ packages = ["src/monarch_ingest"]
 [tool.hatch.build.targets.wheel.force-include]
 "src/monarch_ingest/alembic.ini" = "monarch_ingest/alembic.ini"
 "src/monarch_ingest/migrations" = "monarch_ingest/migrations"
+"src/monarch_ingest/py.typed" = "monarch_ingest/py.typed"
 
 # ---- ruff ----
 [tool.ruff]
