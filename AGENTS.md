@@ -121,6 +121,31 @@ Every agent-authored commit ends with:
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ```
 
+## Agent team
+
+This repo mirrors the private sibling
+[`melon-monarch-cfo`](https://github.com/melon-lab-com/melon-monarch-cfo)'s
+documented agent team. Definitions for custom personas live in
+[`.claude/agents/`](.claude/agents/). Invocation is via Claude
+Code's `Agent` tool with `subagent_type` matching the filename.
+
+| Agent                       | File                                                    | Owns                                                                                                                                      | Triggers                                                                                                                  |
+| ---                         | ---                                                     | ---                                                                                                                                       | ---                                                                                                                       |
+| `code-reviewer`             | built-in Claude Code                                    | Adversarial review across correctness, security, perf, design.                                                                            | Every PR before merge.                                                                                                    |
+| `cloud-ops-specialist`      | [`.claude/agents/cloud-ops-specialist.md`](.claude/agents/cloud-ops-specialist.md) | CI workflow infra (not content), release tagging + CHANGELOG, PyPI publishing, version-pin conventions, CI spend, secret flow maintainer-`.env`→GHA. | PRs touching `.github/workflows/*.yml`, `pyproject.toml` `[project]` / `[build-system]`, release-tag PRs, CHANGELOG drift, published-release incidents. |
+| `simplify` skill            | bundled Claude Code skill                               | End-of-milestone pruning of premature abstractions.                                                                                        | Milestone close.                                                                                                           |
+
+Scope in this repo is narrower than in cfo — there's no VM, no
+Kamal, no TLS, no DNS. If a library release grows cloud surface
+later (hosted test runner, PyPI trusted publishing, a signing
+service), `cloud-ops-specialist` absorbs it.
+
+Release-touching milestones get a `cloud-ops-specialist` review
+before close, in addition to the standard `code-reviewer` gate
+and `simplify` pass. No synthetic-vs-real data fence here (that
+applies only to cfo); the library's equivalent safeguard is the
+pre-existing `block-real-monarch-csv` pre-commit hook.
+
 ## Library-specific rules
 
 ### Schema and hashing contracts are frozen

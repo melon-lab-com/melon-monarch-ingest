@@ -77,4 +77,9 @@ uv.lock.bak
 /.local/
 
 # ---- Claude Code per-repo state (agent memory, settings.local.json, etc.) ----
-.claude/
+# Ignore everything under .claude/ EXCEPT the /agents/ subtree —
+# subagent personas are shared project config and must be
+# committed. Everything else (agent-memory caches,
+# settings.local.json, session scratch) stays local per machine.
+.claude/*
+!.claude/agents/
