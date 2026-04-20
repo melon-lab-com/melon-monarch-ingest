@@ -7,12 +7,7 @@ repos:
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
-        # Vendored JS must stay byte-identical to the upstream CDN
-        # drop so `tests/unit/web/test_vendor_integrity.py` SHA check
-        # matches `version.lock`.
-        exclude: ^src/monarch_cfo/web/static/vendor/.*\.(js|min\.js)$
       - id: end-of-file-fixer
-        exclude: ^src/monarch_cfo/web/static/vendor/.*\.(js|min\.js)$
       - id: check-yaml
       - id: check-toml
       - id: check-merge-conflict
@@ -21,7 +16,6 @@ repos:
       - id: debug-statements
       - id: mixed-line-ending
         args: ["--fix=lf"]
-        exclude: ^src/monarch_cfo/web/static/vendor/.*\.(js|min\.js)$
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.11
@@ -29,6 +23,12 @@ repos:
       - id: ruff-check
         args: ["--fix"]
       - id: ruff-format
+        # `--check` so the hook FAILS on drift instead of silently
+        # auto-fixing. Auto-fix masks the exact issue CI's
+        # `ruff format --check` exists to catch (bit us in PR #2).
+        # To format, run `uv run ruff format .` manually before
+        # committing.
+        args: ["--check"]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.20.1
@@ -42,9 +42,7 @@ repos:
           - "pydantic>=2.7"
           - "pydantic-settings>=2.3"
           - "hypothesis>=6.100"
-          - "typer>=0.12"
-          - "fastapi>=0.115"
-          - "httpx>=0.27"
+          - "typer>=0.13,<0.30"
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.0
