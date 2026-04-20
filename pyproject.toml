@@ -49,6 +49,12 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/monarch_ingest"]
 
+# Include the bundled alembic.ini + migration revisions so a wheel
+# install is self-sufficient (see src/monarch_ingest/migrate.py).
+[tool.hatch.build.targets.wheel.force-include]
+"src/monarch_ingest/alembic.ini" = "monarch_ingest/alembic.ini"
+"src/monarch_ingest/migrations" = "monarch_ingest/migrations"
+
 # ---- ruff ----
 [tool.ruff]
 line-length = 100
