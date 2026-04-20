@@ -215,8 +215,7 @@ def rules_list(db_url: DbUrlOpt = None) -> None:
     for r in all_rules:
         flag = "on " if r.active else "off"
         typer.echo(
-            f"  #{r.id} {flag} {r.kind:<9} p={r.priority:>4} "
-            f"target={r.target_id:>4}  /{r.pattern}/"
+            f"  #{r.id} {flag} {r.kind:<9} p={r.priority:>4} target={r.target_id:>4}  /{r.pattern}/"
         )
 
 
