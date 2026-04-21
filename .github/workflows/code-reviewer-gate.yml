@@ -1,100 +1,102 @@
-name: code-reviewer gate
+name: code-reviewer-gate
+
+# Enforces the "every PR needs a code-reviewer verdict" rule documented in
+# AGENTS.md → Merge policy.  Creates a commit status named `code-reviewer-gate`
+# on the PR's head SHA:
+#
+#   - on pull_request open / synchronize / reopened → state=pending
+#     (new commits invalidate prior verdicts; post a fresh verdict)
+#   - on issue_comment created / edited → scan ALL comments, use the
+#     LATEST one matching the sentinel, set state=success (APPROVED) or
+#     state=failure (REQUEST_CHANGES / CHANGES_REQUESTED)
+#
+# Sentinel format (post as a top-level PR comment, not an inline review):
+#     [code-reviewer] verdict: APPROVED
+# To request changes:
+#     [code-reviewer] verdict: REQUEST_CHANGES
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
   issue_comment:
-    types: [created]
+    types: [created, edited]
 
-# statuses: write — needed to POST a commit status to the PR's HEAD SHA.
-# For issue_comment events the workflow runs on the default branch, not the
-# PR head, so we cannot rely on the Actions check-run being associated with
-# the right commit.  We post the status explicitly via the Statuses API.
 permissions:
   contents: read
-  pull-requests: read
   statuses: write
+  pull-requests: read
+  issues: read
 
 jobs:
-  code-reviewer-gate:
-    name: code-reviewer-gate
+  gate:
+    # Run on every PR event; for issue_comment only when on a PR (not issue).
+    if: github.event_name == 'pull_request' || github.event.issue.pull_request != null
     runs-on: ubuntu-latest
-    # Skip regular issue comments (not on a PR).
-    if: >
-      github.event_name == 'pull_request' ||
-      github.event.issue.pull_request != null
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const CONTEXT = 'code-reviewer-gate';
+            const SENTINEL = /\[code-reviewer\]\s+verdict:\s+(APPROVED|REQUEST_CHANGES|CHANGES_REQUESTED)/i;
 
-      - name: Resolve PR number and HEAD SHA
-        id: pr
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            PR_NUMBER="${{ github.event.pull_request.number }}"
-            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-          else
-            PR_NUMBER="${{ github.event.issue.number }}"
-            HEAD_SHA=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.head.sha')
-          fi
-          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "head_sha=$HEAD_SHA"   >> "$GITHUB_OUTPUT"
+            let pr;
+            if (context.eventName === 'pull_request') {
+              pr = context.payload.pull_request;
+            } else {
+              const { data } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.issue.number,
+              });
+              pr = data;
+            }
 
-      - name: Evaluate verdict
-        id: verdict
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
-          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
-        run: |
-          set -euo pipefail
-          # --field per_page=100 avoids pagination truncation at the
-          # default 30-comment page size.
-          COMMENTS_JSON=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" \
-            --field per_page=100 \
-            --jq '[.[] | {body: .body}]')
-          export COMMENTS_JSON HEAD_SHA
-          RESULT=$(python3 scripts/check_reviewer_verdict.py)
-          echo "result=$RESULT" >> "$GITHUB_OUTPUT"
-          echo "Gate verdict: $RESULT (SHA: $HEAD_SHA)"
+            let state = 'pending';
+            let description = 'Awaiting [code-reviewer] verdict';
 
-      - name: Post commit status
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
-          RESULT: ${{ steps.verdict.outputs.result }}
-        run: |
-          set -euo pipefail
-          case "$RESULT" in
-            APPROVED)
-              STATE="success"
-              DESC="code-reviewer approved this commit"
-              ;;
-            CHANGES_REQUESTED)
-              STATE="failure"
-              DESC="code-reviewer requested changes — address blockers before merge"
-              ;;
-            *)
-              STATE="failure"
-              DESC="No code-reviewer verdict for SHA ${HEAD_SHA:0:7} — post verdict comment first"
-              ;;
-          esac
-          gh api -X POST "repos/$REPO/statuses/$HEAD_SHA" \
-            --field state="$STATE" \
-            --field description="$DESC" \
-            --field context="code-reviewer-gate"
-          echo "Posted status: $STATE"
+            if (context.eventName === 'issue_comment') {
+              const comments = await github.paginate(
+                github.rest.issues.listComments,
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  per_page: 100,
+                },
+              );
 
-      - name: Fail job if not approved
-        if: steps.verdict.outputs.result != 'APPROVED'
-        run: |
-          echo "::error::No approved verdict for SHA ${{ steps.pr.outputs.head_sha }}."
-          echo "Post a verdict comment:"
-          echo "  [code-reviewer] verdict: APPROVED"
-          echo "  reviewed-sha: ${{ steps.pr.outputs.head_sha }}"
-          exit 1
+              // Pick the LATEST matching comment by updated_at so an edited
+              // verdict (e.g. APPROVED → REQUEST_CHANGES after a follow-up)
+              // always wins.
+              let latest = null;
+              for (const c of comments) {
+                const m = (c.body || '').match(SENTINEL);
+                if (!m) continue;
+                if (!latest || new Date(c.updated_at) >= new Date(latest.at)) {
+                  latest = { verdict: m[1].toUpperCase(), at: c.updated_at };
+                }
+              }
+
+              if (latest) {
+                if (latest.verdict === 'APPROVED') {
+                  state = 'success';
+                  description = 'code-reviewer APPROVED';
+                } else {
+                  state = 'failure';
+                  description = `code-reviewer ${latest.verdict}`;
+                }
+              }
+            }
+            // else: pull_request event → always reset to pending; new commits
+            // invalidate prior verdicts.
+
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: pr.head.sha,
+              state,
+              context: CONTEXT,
+              description,
+            });
+
+            core.info(`Set ${CONTEXT} = ${state} (${description}) on ${pr.head.sha}`);

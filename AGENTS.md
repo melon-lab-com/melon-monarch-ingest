@@ -31,28 +31,34 @@ change must land through a PR. No admin bypass; `enforce_admins: true`.
 ### `code-reviewer-gate` required status check
 
 Every PR must pass the `code-reviewer-gate` CI check before it can
-merge. The check evaluates PR comments for a sentinel verdict:
+merge. The check evaluates PR comments for a sentinel verdict.
+
+**Sentinel format** — post as a top-level PR comment (not an inline
+review comment):
 
 ```
 [code-reviewer] verdict: APPROVED
-reviewed-sha: <full 40-char SHA of the tip commit reviewed>
+```
+
+Or to block merge:
+
+```
+[code-reviewer] verdict: REQUEST_CHANGES
 ```
 
 **How to satisfy the gate:**
 
 1. Run the `code-reviewer` subagent against the PR.
 2. Address blockers; justify dismissed nits.
-3. Post the verdict comment with the exact format above. The SHA must
-   match the PR's current HEAD commit exactly.
+3. Post the verdict comment in the format above.
 4. The gate re-evaluates within ~60 s (triggered by the `issue_comment`
    event). Wait for the green check before merging.
 
-**After a new push:** the gate reverts to failing until a fresh verdict
-comment is posted for the new HEAD SHA. The old approval is intentionally
-invalidated — don't recycle stale verdicts.
+**After a new push:** the gate resets to `pending`. Post a fresh verdict
+for the updated code before merging.
 
-**CHANGES REQUESTED:** keeps the gate red. Fix the blockers, push, then
-post a new `APPROVED` verdict for the new SHA.
+**REQUEST_CHANGES:** keeps the gate red. Fix the blockers, push, then
+post a new `APPROVED` verdict.
 
 ### Applying / re-applying branch protection
 

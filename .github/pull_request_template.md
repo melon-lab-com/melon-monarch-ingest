@@ -33,36 +33,23 @@ Drop boilerplate like "added tests" if it's the default.>
 
 ## Required reviews
 
-- [ ] **code-reviewer verdict comment posted for the current HEAD SHA**
-      (required — the `code-reviewer-gate` CI check blocks merge until a
-      matching comment is present; see instructions below)
+- [ ] **code-reviewer agent run, verdict posted, blockers resolved.**
+      Invoke the `code-reviewer` subagent. When it returns, post a
+      **top-level PR comment** (not an inline review comment) with the
+      sentinel the `code-reviewer-gate` workflow scans for:
 
-<details>
-<summary>How to post the verdict (expand)</summary>
+      ```
+      [code-reviewer] verdict: APPROVED
+      ```
 
-1. Run the `code-reviewer` subagent on this PR (e.g. via Claude Code's
-   built-in `code-reviewer` agent type).
-2. Address any blockers; justify dismissed nits in a reply.
-3. Post a **top-level PR comment** (use the comment box at the bottom of the
-   conversation, not an inline review comment) whose **first two lines are
-   exactly**:
+      Or, if blockers remain:
 
-   ```
-   [code-reviewer] verdict: APPROVED
-   reviewed-sha: <full 40-char SHA of the tip commit you reviewed>
-   ```
+      ```
+      [code-reviewer] verdict: REQUEST_CHANGES
+      ```
 
-   Or, if blockers remain:
-
-   ```
-   [code-reviewer] verdict: CHANGES REQUESTED
-   reviewed-sha: <full 40-char SHA>
-   ```
-
-4. The `code-reviewer-gate` CI job will re-evaluate within ~30 s.
-   A new push **resets the gate** — post a fresh verdict for the new SHA.
-
-</details>
+      New commits reset the gate to `pending` — re-run and post a
+      fresh verdict. See AGENTS.md → **Merge policy** for details.
 
 ## Data safety
 
