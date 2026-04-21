@@ -6,7 +6,11 @@ on:
   pull_request:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Scope per-job so a rapid push only cancels the same job on the old
+  # commit, not other jobs.  Cross-job cancellation left a `cancelled`
+  # status on required checks, which branch protection treats as pending
+  # and deadlocks the PR until the next push.
+  group: ci-${{ github.ref }}-${{ github.job }}
   cancel-in-progress: true
 
 jobs:

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Idempotent: reads scripts/branch_protection_config.json and applies it to main.
-# Usage: REPO=melon-lab-com/melon-monarch-cfo bash scripts/apply_branch_protection.sh
+# Usage: REPO=melon-lab-com/melon-monarch-ingest bash scripts/apply_branch_protection.sh
 #        (defaults to the repo detected by gh in the current directory)
 set -euo pipefail
 

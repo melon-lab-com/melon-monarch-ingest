@@ -65,15 +65,15 @@ jobs:
                 },
               );
 
-              // Pick the LATEST matching comment by updated_at so an edited
-              // verdict (e.g. APPROVED → REQUEST_CHANGES after a follow-up)
-              // always wins.
+              // Pick the LATEST matching comment by created_at (not
+              // updated_at) so editing an old APPROVED comment can't
+              // trump a newer REQUEST_CHANGES verdict posted after it.
               let latest = null;
               for (const c of comments) {
                 const m = (c.body || '').match(SENTINEL);
                 if (!m) continue;
-                if (!latest || new Date(c.updated_at) >= new Date(latest.at)) {
-                  latest = { verdict: m[1].toUpperCase(), at: c.updated_at };
+                if (!latest || new Date(c.created_at) > new Date(latest.at)) {
+                  latest = { verdict: m[1].toUpperCase(), at: c.created_at };
                 }
               }
 
