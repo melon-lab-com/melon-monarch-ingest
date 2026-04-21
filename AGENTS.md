@@ -44,7 +44,7 @@ reviewed-sha: <full 40-char SHA of the tip commit reviewed>
 2. Address blockers; justify dismissed nits.
 3. Post the verdict comment with the exact format above. The SHA must
    match the PR's current HEAD commit exactly.
-4. The gate re-evaluates within ~30 s (triggered by the `issue_comment`
+4. The gate re-evaluates within ~60 s (triggered by the `issue_comment`
    event). Wait for the green check before merging.
 
 **After a new push:** the gate reverts to failing until a fresh verdict

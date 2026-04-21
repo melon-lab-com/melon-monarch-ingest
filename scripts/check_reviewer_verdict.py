@@ -1,21 +1,34 @@
 """Read PR comments from $COMMENTS_JSON and match the sentinel for $HEAD_SHA.
 
-Exits 0 and prints APPROVED / CHANGES_REQUESTED / PENDING.
+Prints APPROVED / CHANGES_REQUESTED / PENDING and exits 0.
 Called by .github/workflows/code-reviewer-gate.yml.
+
+Rules:
+- Only comments NOT authored by $PR_AUTHOR are considered (no self-approval).
+- The last matching verdict for $HEAD_SHA wins (revoke with CHANGES REQUESTED).
+- "body": null comments (deleted) are silently skipped.
 """
 
 import json
 import os
-import sys
 
 head_sha = os.environ["HEAD_SHA"]
-comments: list[dict[str, str]] = json.loads(os.environ["COMMENTS_JSON"])
+pr_author = os.environ.get("PR_AUTHOR", "")
+comments: list[dict[str, str | None]] = json.loads(os.environ["COMMENTS_JSON"])
 
 APPROVED = "[code-reviewer] verdict: APPROVED"
 REJECTED = "[code-reviewer] verdict: CHANGES REQUESTED"
 
+result: str | None = None
+
 for comment in comments:
-    lines = comment["body"].strip().splitlines()
+    # Skip self-approvals and deleted bodies.
+    if comment.get("author") == pr_author:
+        continue
+    body = comment.get("body")
+    if not body:
+        continue
+    lines = body.strip().splitlines()
     if not lines:
         continue
     first = lines[0].strip()
@@ -25,7 +38,8 @@ for comment in comments:
         if line.strip().startswith("reviewed-sha:"):
             sha = line.split(":", 1)[1].strip()
             if sha == head_sha:
-                print("APPROVED" if first == APPROVED else "CHANGES_REQUESTED")
-                sys.exit(0)
+                # Keep iterating — last matching verdict wins.
+                result = "APPROVED" if first == APPROVED else "CHANGES_REQUESTED"
+                break
 
-print("PENDING")
+print(result if result is not None else "PENDING")

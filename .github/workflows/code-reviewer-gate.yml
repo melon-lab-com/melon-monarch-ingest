@@ -52,9 +52,13 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
         run: |
           set -euo pipefail
+          # Preserve author to block self-approval.  --field per_page=100
+          # avoids pagination truncation at the default 30-comment page.
           COMMENTS_JSON=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" \
-            --jq '[.[] | {body: .body}]')
-          export COMMENTS_JSON HEAD_SHA
+            --field per_page=100 \
+            --jq '[.[] | {body: .body, author: .user.login}]')
+          PR_AUTHOR=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.user.login')
+          export COMMENTS_JSON HEAD_SHA PR_AUTHOR
           RESULT=$(python3 scripts/check_reviewer_verdict.py)
           echo "result=$RESULT" >> "$GITHUB_OUTPUT"
           echo "Gate verdict: $RESULT (SHA: $HEAD_SHA)"

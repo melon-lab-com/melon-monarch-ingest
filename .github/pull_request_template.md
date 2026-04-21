@@ -43,7 +43,9 @@ Drop boilerplate like "added tests" if it's the default.>
 1. Run the `code-reviewer` subagent on this PR (e.g. via Claude Code's
    built-in `code-reviewer` agent type).
 2. Address any blockers; justify dismissed nits in a reply.
-3. Post a PR comment whose **first two lines are exactly**:
+3. Post a **top-level PR comment** (use the comment box at the bottom of the
+   conversation, not an inline review comment) whose **first two lines are
+   exactly**:
 
    ```
    [code-reviewer] verdict: APPROVED
