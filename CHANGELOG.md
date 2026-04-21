@@ -4,6 +4,14 @@ Notable changes to `melon-monarch-ingest`. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Infrastructure
+
+- Branch protection on `main`: direct pushes rejected, `code-reviewer-gate`
+  required status check, `enforce_admins: true`. Sentinel:
+  `[code-reviewer] verdict: APPROVED` in a top-level PR comment.
+
 ## [0.1.0] — 2026-04-19
 
 ### Added
