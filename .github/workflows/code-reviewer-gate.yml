@@ -1,0 +1,97 @@
+name: code-reviewer gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+# statuses: write — needed to POST a commit status to the PR's HEAD SHA.
+# For issue_comment events the workflow runs on the default branch, not the
+# PR head, so we cannot rely on the Actions check-run being associated with
+# the right commit.  We post the status explicitly via the Statuses API.
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+jobs:
+  code-reviewer-gate:
+    name: code-reviewer-gate
+    runs-on: ubuntu-latest
+    # Skip regular issue comments (not on a PR).
+    if: >
+      github.event_name == 'pull_request' ||
+      github.event.issue.pull_request != null
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve PR number and HEAD SHA
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            PR_NUMBER="${{ github.event.issue.number }}"
+            HEAD_SHA=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.head.sha')
+          fi
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$HEAD_SHA"   >> "$GITHUB_OUTPUT"
+
+      - name: Evaluate verdict
+        id: verdict
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          COMMENTS_JSON=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" \
+            --jq '[.[] | {body: .body}]')
+          export COMMENTS_JSON HEAD_SHA
+          RESULT=$(python3 scripts/check_reviewer_verdict.py)
+          echo "result=$RESULT" >> "$GITHUB_OUTPUT"
+          echo "Gate verdict: $RESULT (SHA: $HEAD_SHA)"
+
+      - name: Post commit status
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          RESULT: ${{ steps.verdict.outputs.result }}
+        run: |
+          set -euo pipefail
+          case "$RESULT" in
+            APPROVED)
+              STATE="success"
+              DESC="code-reviewer approved this commit"
+              ;;
+            CHANGES_REQUESTED)
+              STATE="failure"
+              DESC="code-reviewer requested changes — address blockers before merge"
+              ;;
+            *)
+              STATE="failure"
+              DESC="No code-reviewer verdict for SHA ${HEAD_SHA:0:7} — post verdict comment first"
+              ;;
+          esac
+          gh api -X POST "repos/$REPO/statuses/$HEAD_SHA" \
+            --field state="$STATE" \
+            --field description="$DESC" \
+            --field context="code-reviewer-gate"
+          echo "Posted status: $STATE"
+
+      - name: Fail job if not approved
+        if: steps.verdict.outputs.result != 'APPROVED'
+        run: |
+          echo "::error::No approved verdict for SHA ${{ steps.pr.outputs.head_sha }}."
+          echo "Post a verdict comment:"
+          echo "  [code-reviewer] verdict: APPROVED"
+          echo "  reviewed-sha: ${{ steps.pr.outputs.head_sha }}"
+          exit 1

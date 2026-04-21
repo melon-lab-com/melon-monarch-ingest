@@ -33,9 +33,34 @@ Drop boilerplate like "added tests" if it's the default.>
 
 ## Required reviews
 
-- [ ] **code-reviewer agent review posted on this PR and blockers resolved**
-      (required — invoke the `code-reviewer` subagent, post its review
-      as a PR review, address findings or justify dismissal in a comment)
+- [ ] **code-reviewer verdict comment posted for the current HEAD SHA**
+      (required — the `code-reviewer-gate` CI check blocks merge until a
+      matching comment is present; see instructions below)
+
+<details>
+<summary>How to post the verdict (expand)</summary>
+
+1. Run the `code-reviewer` subagent on this PR (e.g. via Claude Code's
+   built-in `code-reviewer` agent type).
+2. Address any blockers; justify dismissed nits in a reply.
+3. Post a PR comment whose **first two lines are exactly**:
+
+   ```
+   [code-reviewer] verdict: APPROVED
+   reviewed-sha: <full 40-char SHA of the tip commit you reviewed>
+   ```
+
+   Or, if blockers remain:
+
+   ```
+   [code-reviewer] verdict: CHANGES REQUESTED
+   reviewed-sha: <full 40-char SHA>
+   ```
+
+4. The `code-reviewer-gate` CI job will re-evaluate within ~30 s.
+   A new push **resets the gate** — post a fresh verdict for the new SHA.
+
+</details>
 
 ## Data safety
 

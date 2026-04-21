@@ -23,6 +23,43 @@ library, not an app.
 5. Small atomic commits > big mega-commits.
 6. On merge: `--squash --delete-branch`. No merge commits.
 
+## Merge policy
+
+`main` is a protected branch. **Direct pushes are rejected.** Every
+change must land through a PR. No admin bypass; `enforce_admins: true`.
+
+### `code-reviewer-gate` required status check
+
+Every PR must pass the `code-reviewer-gate` CI check before it can
+merge. The check evaluates PR comments for a sentinel verdict:
+
+```
+[code-reviewer] verdict: APPROVED
+reviewed-sha: <full 40-char SHA of the tip commit reviewed>
+```
+
+**How to satisfy the gate:**
+
+1. Run the `code-reviewer` subagent against the PR.
+2. Address blockers; justify dismissed nits.
+3. Post the verdict comment with the exact format above. The SHA must
+   match the PR's current HEAD commit exactly.
+4. The gate re-evaluates within ~30 s (triggered by the `issue_comment`
+   event). Wait for the green check before merging.
+
+**After a new push:** the gate reverts to failing until a fresh verdict
+comment is posted for the new HEAD SHA. The old approval is intentionally
+invalidated — don't recycle stale verdicts.
+
+**CHANGES REQUESTED:** keeps the gate red. Fix the blockers, push, then
+post a new `APPROVED` verdict for the new SHA.
+
+### Applying / re-applying branch protection
+
+The protection config is committed at `scripts/branch_protection_config.json`.
+Run `bash scripts/apply_branch_protection.sh` from the repo root (with `gh`
+authenticated) to re-apply it idempotently.
+
 ## Repository layout
 
 ```
