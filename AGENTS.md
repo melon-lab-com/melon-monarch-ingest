@@ -169,8 +169,26 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 This repo mirrors the private sibling
 [`melon-monarch-cfo`](https://github.com/melon-lab-com/melon-monarch-cfo)'s
 documented agent team. Definitions for custom personas live in
-[`.claude/agents/`](.claude/agents/). Invocation is via Claude
-Code's `Agent` tool with `subagent_type` matching the filename.
+[`.claude/agents/`](.claude/agents/). Each persona is invocable
+either as a one-shot **subagent** via Claude Code's `Agent` tool
+(`subagent_type` matches the filename), or as a **teammate** in
+a multi-session agent team (as of 2026-04-21).
+
+### Coordination modes
+
+Pick the smallest mode that fits the task:
+
+| Mode | Use for | Don't use for |
+| --- | --- | --- |
+| **Solo session** | Routine sequential work, long-running tasks that rely on `/resume` / `/rewind`, release-tag PRs and PyPI-publish flows. | Workloads that genuinely fan out. |
+| **Subagent (`Agent` tool)** | Focused research or review within a session. The SHA-anchored `code-reviewer` verdict on every PR runs here by default. | Work where the helper needs to talk to a peer. |
+| **Agent team** | 3–5 parallel workstreams that talk to each other — parallel review, adversarial debugging, multi-angle research. Good library-side fit: a contract-parity debate between `code-reviewer` and a `Plan` teammate when ADR-0002 / 0007 hash payloads are touched. | Release-tag / publish runs (no `/resume` restoration of in-process teammates). Nested teams (not supported). |
+
+Full guardrails (team size, token budget, persona-carryover
+rules, no-resumption caveat) live in [cfo `AGENTS.md` § Agent
+teams](https://github.com/melon-lab-com/melon-monarch-cfo/blob/main/AGENTS.md#agent-teams).
+
+### Personas
 
 | Agent                       | File                                                    | Owns                                                                                                                                      | Triggers                                                                                                                  |
 | ---                         | ---                                                     | ---                                                                                                                                       | ---                                                                                                                       |
