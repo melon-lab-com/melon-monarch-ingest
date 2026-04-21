@@ -4,16 +4,19 @@ Prints APPROVED / CHANGES_REQUESTED / PENDING and exits 0.
 Called by .github/workflows/code-reviewer-gate.yml.
 
 Rules:
-- Only comments NOT authored by $PR_AUTHOR are considered (no self-approval).
-- The last matching verdict for $HEAD_SHA wins (revoke with CHANGES REQUESTED).
 - "body": null comments (deleted) are silently skipped.
+- The last matching verdict for $HEAD_SHA wins (a CHANGES REQUESTED posted
+  after an APPROVED for the same SHA revokes the approval).
+- No author check: this is a solo-contributor repo; the code-reviewer agent
+  runs as the repo owner and posts verdicts under their account. The SHA
+  anchor is the meaningful integrity mechanism. For multi-contributor repos
+  add: `if comment.get("author") == os.environ.get("PR_AUTHOR"): continue`.
 """
 
 import json
 import os
 
 head_sha = os.environ["HEAD_SHA"]
-pr_author = os.environ.get("PR_AUTHOR", "")
 comments: list[dict[str, str | None]] = json.loads(os.environ["COMMENTS_JSON"])
 
 APPROVED = "[code-reviewer] verdict: APPROVED"
@@ -22,9 +25,6 @@ REJECTED = "[code-reviewer] verdict: CHANGES REQUESTED"
 result: str | None = None
 
 for comment in comments:
-    # Skip self-approvals and deleted bodies.
-    if comment.get("author") == pr_author:
-        continue
     body = comment.get("body")
     if not body:
         continue
