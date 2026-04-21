@@ -33,9 +33,23 @@ Drop boilerplate like "added tests" if it's the default.>
 
 ## Required reviews
 
-- [ ] **code-reviewer agent review posted on this PR and blockers resolved**
-      (required — invoke the `code-reviewer` subagent, post its review
-      as a PR review, address findings or justify dismissal in a comment)
+- [ ] **code-reviewer agent run, verdict posted, blockers resolved.**
+      Invoke the `code-reviewer` subagent. When it returns, post a
+      **top-level PR comment** (not an inline review comment) with the
+      sentinel the `code-reviewer-gate` workflow scans for:
+
+      ```
+      [code-reviewer] verdict: APPROVED
+      ```
+
+      Or, if blockers remain:
+
+      ```
+      [code-reviewer] verdict: REQUEST_CHANGES
+      ```
+
+      New commits reset the gate to `pending` — re-run and post a
+      fresh verdict. See AGENTS.md → **Merge policy** for details.
 
 ## Data safety
 

@@ -1,0 +1,102 @@
+name: code-reviewer-gate
+
+# Enforces the "every PR needs a code-reviewer verdict" rule documented in
+# AGENTS.md → Merge policy.  Creates a commit status named `code-reviewer-gate`
+# on the PR's head SHA:
+#
+#   - on pull_request open / synchronize / reopened → state=pending
+#     (new commits invalidate prior verdicts; post a fresh verdict)
+#   - on issue_comment created / edited → scan ALL comments, use the
+#     LATEST one matching the sentinel, set state=success (APPROVED) or
+#     state=failure (REQUEST_CHANGES / CHANGES_REQUESTED)
+#
+# Sentinel format (post as a top-level PR comment, not an inline review):
+#     [code-reviewer] verdict: APPROVED
+# To request changes:
+#     [code-reviewer] verdict: REQUEST_CHANGES
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+  statuses: write
+  pull-requests: read
+  issues: read
+
+jobs:
+  gate:
+    # Run on every PR event; for issue_comment only when on a PR (not issue).
+    if: github.event_name == 'pull_request' || github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const CONTEXT = 'code-reviewer-gate';
+            const SENTINEL = /\[code-reviewer\]\s+verdict:\s+(APPROVED|REQUEST_CHANGES|CHANGES_REQUESTED)/i;
+
+            let pr;
+            if (context.eventName === 'pull_request') {
+              pr = context.payload.pull_request;
+            } else {
+              const { data } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.issue.number,
+              });
+              pr = data;
+            }
+
+            let state = 'pending';
+            let description = 'Awaiting [code-reviewer] verdict';
+
+            if (context.eventName === 'issue_comment') {
+              const comments = await github.paginate(
+                github.rest.issues.listComments,
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  per_page: 100,
+                },
+              );
+
+              // Pick the LATEST matching comment by created_at (not
+              // updated_at) so editing an old APPROVED comment can't
+              // trump a newer REQUEST_CHANGES verdict posted after it.
+              let latest = null;
+              for (const c of comments) {
+                const m = (c.body || '').match(SENTINEL);
+                if (!m) continue;
+                if (!latest || new Date(c.created_at) > new Date(latest.at)) {
+                  latest = { verdict: m[1].toUpperCase(), at: c.created_at };
+                }
+              }
+
+              if (latest) {
+                if (latest.verdict === 'APPROVED') {
+                  state = 'success';
+                  description = 'code-reviewer APPROVED';
+                } else {
+                  state = 'failure';
+                  description = `code-reviewer ${latest.verdict}`;
+                }
+              }
+            }
+            // else: pull_request event → always reset to pending; new commits
+            // invalidate prior verdicts.
+
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: pr.head.sha,
+              state,
+              context: CONTEXT,
+              description,
+            });
+
+            core.info(`Set ${CONTEXT} = ${state} (${description}) on ${pr.head.sha}`);
