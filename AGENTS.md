@@ -176,12 +176,20 @@ Code's `Agent` tool with `subagent_type` matching the filename.
 | ---                         | ---                                                     | ---                                                                                                                                       | ---                                                                                                                       |
 | `code-reviewer`             | built-in Claude Code                                    | Adversarial review across correctness, security, perf, design.                                                                            | Every PR before merge.                                                                                                    |
 | `cloud-ops-specialist`      | [`.claude/agents/cloud-ops-specialist.md`](.claude/agents/cloud-ops-specialist.md) | CI workflow infra (not content), release tagging + CHANGELOG, PyPI publishing, version-pin conventions, CI spend, secret flow maintainer-`.env`→GHA. | PRs touching `.github/workflows/*.yml`, `pyproject.toml` `[project]` / `[build-system]`, release-tag PRs, CHANGELOG drift, published-release incidents. |
+| `quality-steward`           | sibling-owned — see [cfo `.claude/agents/quality-steward.md`](https://github.com/melon-lab-com/melon-monarch-cfo/blob/main/.claude/agents/quality-steward.md) | Periodic retrospection + proactive quality/architecture improvement. Covers both cfo and ingest from a single trigger — files separate issues per repo. | Scheduled pulse check (60-day backstop per [cfo ADR-0011](https://github.com/melon-lab-com/melon-monarch-cfo/blob/main/docs/decisions/0011-retro-and-quality-steward.md)); scheduled-task wiring tracked on [cfo#111](https://github.com/melon-lab-com/melon-monarch-cfo/issues/111). Kill switch: `quality-steward: paused` label (exists in this repo). Ingest-side companion issue: [#10](https://github.com/melon-lab-com/melon-monarch-ingest/issues/10). |
 | `simplify` skill            | bundled Claude Code skill                               | End-of-milestone pruning of premature abstractions.                                                                                        | Milestone close.                                                                                                           |
 
 Scope in this repo is narrower than in cfo — there's no VM, no
 Kamal, no TLS, no DNS. If a library release grows cloud surface
 later (hosted test runner, PyPI trusted publishing, a signing
 service), `cloud-ops-specialist` absorbs it.
+
+`quality-steward` is defined on the cfo side and reaches across
+both repos; there is no local persona file in this repo. Ingest-side
+ritual parity (retro at milestone close) is not yet adopted on this
+library — ingest doesn't have independent milestones today — but the
+steward's pulse-check and persona-health audits cover this repo
+regardless.
 
 Release-touching milestones get a `cloud-ops-specialist` review
 before close, in addition to the standard `code-reviewer` gate
